@@ -1,0 +1,69 @@
+# Intégration continue de TRAINING OS AI (dossier training-os/)
+# Code → Git → Tests → Staging → Validation → Production (§60)
+name: TRAINING OS AI — CI
+
+on:
+  push:
+    paths: ["training-os/**", ".github/workflows/training-os-*.yml"]
+  pull_request:
+    paths: ["training-os/**", ".github/workflows/training-os-*.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: training-os-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: training-os
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: training-os/package-lock.json
+      - name: Rôles et base de test PostgreSQL
+        run: |
+          psql -h localhost -U postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE trainingos_owner LOGIN PASSWORD 'owner_dev_pw' CREATEDB" \
+            -c "CREATE ROLE trainingos_app LOGIN PASSWORD 'app_dev_pw' NOSUPERUSER NOBYPASSRLS" \
+            -c "CREATE DATABASE trainingos_test OWNER trainingos_owner"
+      - run: npm ci --no-audit --no-fund
+      - name: Audit des dépendances (production, vulnérabilités élevées)
+        run: npm audit --omit=dev --audit-level=high
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Tests unitaires + intégration (isolation RLS, sécurité, workflows)
+        run: npm test
+      - name: Build de production
+        run: npm run build
+        env:
+          DATABASE_URL: postgres://unused:unused@localhost:5432/unused
+          APP_SECRET: build-only-secret-not-used-at-runtime-000000
+
+  docker:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Construction de l'image Docker
+        run: docker build --target runner -t trainingos:ci .

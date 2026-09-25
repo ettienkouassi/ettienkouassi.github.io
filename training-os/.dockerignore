@@ -1,0 +1,12 @@
+node_modules
+.next
+storage
+storage-test
+backups
+coverage
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+Dockerfile
+docker-compose*.yml

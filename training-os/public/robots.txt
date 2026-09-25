@@ -1,0 +1,6 @@
+User-agent: *
+Disallow: /app
+Disallow: /admin
+Disallow: /student
+Disallow: /instructor
+Disallow: /api

@@ -1,0 +1,3 @@
+# Le site GitHub Pages ne publie PAS le code de l application TRAINING OS AI
+exclude:
+  - training-os
