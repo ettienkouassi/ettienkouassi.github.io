@@ -34,6 +34,12 @@ services:
       DATABASE_URL: postgres://trainingos_app:${DB_APP_PASSWORD}@db:5432/trainingos
       APP_ENV: ${APP_ENV:-production}
       APP_SECRET: ${APP_SECRET:?}
+      APP_URL: ${APP_URL:-}
+      VERIFY_URL: ${VERIFY_URL:-}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      STORAGE_LOCAL_DIR: /app/storage
+    volumes:
+      - storage:/app/storage
     depends_on:
       db: { condition: service_healthy }
 
@@ -56,8 +62,7 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      APP_DOMAIN: ${APP_DOMAIN:?}
-      VERIFY_DOMAIN: ${VERIFY_DOMAIN:?}
+      CADDY_SITES: ${CADDY_SITES:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

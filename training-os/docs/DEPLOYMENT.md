@@ -23,6 +23,19 @@ Le déploiement fait : sauvegarde → migrations → redémarrage → contrôle 
 
 ---
 
+## Staging sur un VPS en ~15 minutes (script automatique)
+
+1. Louer un VPS Ubuntu 24.04 (2 vCPU, 4 Go RAM, 40 Go) — Hetzner CX22, OVHcloud VPS, Scaleway, DigitalOcean…
+2. (Facultatif) Créer un enregistrement DNS `A` `staging.votre-domaine` → IP du serveur. Sans domaine, le script utilise automatiquement `app.<IP>.sslip.io` (HTTPS valide).
+3. Se connecter en SSH puis :
+   ```bash
+   curl -fsSL https://raw.githubusercontent.com/ettienkouassi/ettienkouassi.github.io/main/training-os/deploy/setup-vps.sh -o setup-vps.sh
+   sudo ACME_EMAIL=vous@exemple.com ADMIN_EMAIL=vous@exemple.com bash setup-vps.sh
+   #   options : APP_DOMAIN=staging.votre-domaine  SEED_DEMO=no  ANTHROPIC_API_KEY=…  SMTP_HOST=… SMTP_USER=… SMTP_PASSWORD=…
+   ```
+4. Le script installe Docker, le pare-feu (22/80/443), fail2ban, les mises à jour automatiques, génère les secrets (`/opt/trainingos/training-os/.env.production`, droits 600), construit, migre, vérifie que le rôle applicatif est sans privilège, charge la démonstration (mot de passe aléatoire), crée le super admin (mot de passe temporaire affiché) et lance HTTPS, cron et sauvegardes.
+5. Mises à jour : `sudo bash /opt/trainingos/training-os/deploy/update.sh` (sauvegarde → code → migrations → redémarrage → contrôle).
+
 ## Option A — Serveur VPS avec Docker (recommandée pour le pilote)
 
 Maîtrise complète des données et coût prévisible (~10–25 €/mois : Hetzner, OVHcloud, Scaleway, DigitalOcean ; 2 vCPU / 4 Go / 80 Go SSD suffisent pour le pilote).
