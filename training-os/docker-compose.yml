@@ -62,8 +62,7 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      APP_DOMAIN: ${APP_DOMAIN:?}
-      VERIFY_DOMAIN: ${VERIFY_DOMAIN:?}
+      CADDY_SITES: ${CADDY_SITES:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro

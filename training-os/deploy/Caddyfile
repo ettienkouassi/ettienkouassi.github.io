@@ -4,7 +4,8 @@
 	email {$ACME_EMAIL}
 }
 
-{$APP_DOMAIN}, {$VERIFY_DOMAIN} {
+# CADDY_SITES : « app.domaine » ou « app.domaine, verify.domaine »
+{$CADDY_SITES} {
 	encode zstd gzip
 	# Taille max des téléversements (supports de cours : 50 Mo)
 	request_body {

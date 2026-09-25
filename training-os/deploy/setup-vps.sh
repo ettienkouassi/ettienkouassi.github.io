@@ -90,7 +90,14 @@ if [ -z "${APP_DOMAIN:-}" ]; then
   APP_DOMAIN="app.${PUBLIC_IP//./-}.sslip.io"
   echo "   Pas de domaine fourni : utilisation de $APP_DOMAIN (DNS automatique sslip.io)"
 fi
-VERIFY_DOMAIN="${VERIFY_DOMAIN:-verify.${APP_DOMAIN#app.}}"
+# sslip.io : sous-domaine « verify » automatique ; domaine personnel : même domaine par défaut
+# (un seul enregistrement DNS nécessaire), sauf si VERIFY_DOMAIN est fourni.
+if [[ "$APP_DOMAIN" == *.sslip.io ]]; then
+  VERIFY_DOMAIN="${VERIFY_DOMAIN:-verify.${APP_DOMAIN#app.}}"
+else
+  VERIFY_DOMAIN="${VERIFY_DOMAIN:-$APP_DOMAIN}"
+fi
+if [ "$VERIFY_DOMAIN" = "$APP_DOMAIN" ]; then CADDY_SITES="$APP_DOMAIN"; else CADDY_SITES="$APP_DOMAIN, $VERIFY_DOMAIN"; fi
 
 log "6/9 Fichier de configuration et secrets ($ENV_FILE)"
 if [ -f "$ENV_FILE" ]; then
@@ -106,6 +113,7 @@ APP_URL=https://$APP_DOMAIN
 VERIFY_URL=https://$VERIFY_DOMAIN
 APP_DOMAIN=$APP_DOMAIN
 VERIFY_DOMAIN=$VERIFY_DOMAIN
+CADDY_SITES=$CADDY_SITES
 ACME_EMAIL=$ACME_EMAIL
 
 POSTGRES_SUPERUSER_PASSWORD=$(hex 32)
