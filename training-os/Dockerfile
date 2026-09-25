@@ -28,6 +28,8 @@ COPY package.json tsconfig.json drizzle.config.ts ./
 COPY drizzle ./drizzle
 COPY scripts ./scripts
 COPY src ./src
+# Même volume de fichiers que l'application (certificats générés par le seed / les scripts)
+RUN mkdir -p /app/storage && chown node:node /app/storage
 USER node
 CMD ["npm", "run", "db:migrate"]
 

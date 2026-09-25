@@ -57,7 +57,10 @@ async function main() {
         { code: "enterprise", name: "Enterprise", description: "Écoles et organismes importants — prix sur devis", priceMonthly: null, maxStudents: null, maxInstructors: null, maxCourses: null, maxAdmins: null, storageMb: null, aiRequestsPerMonth: null },
       ])
       .returning();
-    await tx.insert(s.users).values({ email: "superadmin@trainingos.ai", passwordHash, firstName: "Super", lastName: "Admin", role: "super_admin", emailVerifiedAt: new Date() });
+    // Super admin de démonstration uniquement en local : sur un serveur, utiliser « create-super-admin »
+    if (!process.env.APP_ENV || ["development", "test"].includes(process.env.APP_ENV)) {
+      await tx.insert(s.users).values({ email: "superadmin@trainingos.ai", passwordHash, firstName: "Super", lastName: "Admin", role: "super_admin", emailVerifiedAt: new Date() });
+    }
 
     const [demo] = await tx
       .insert(s.organizations)
@@ -348,8 +351,7 @@ Exercice : calculer la commission de chaque commercial avec SI et RECHERCHEX.`,
 
   console.log(`
 Comptes de démonstration (mot de passe : ${DEMO_PASSWORD})
-  Super admin     : superadmin@trainingos.ai
-  Admin centre    : admin@demo.trainingos.ai
+${!process.env.APP_ENV || ["development", "test"].includes(process.env.APP_ENV) ? "  Super admin     : superadmin@trainingos.ai\n" : ""}  Admin centre    : admin@demo.trainingos.ai
   Gestionnaire    : gestion@demo.trainingos.ai
   Formateur       : formateur1@demo.trainingos.ai
   Étudiant        : etudiant21@demo.trainingos.ai (Excel en cours) / etudiant1@demo.trainingos.ai (diplômé)
