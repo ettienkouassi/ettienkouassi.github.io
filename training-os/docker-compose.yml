@@ -1,0 +1,102 @@
+# ---------------------------------------------------------------
+# TRAINING OS AI — hébergement autonome (VPS : OVH, Hetzner, Scaleway, DigitalOcean…)
+#   cp deploy/.env.production.example .env.production   (remplir les secrets)
+#   docker compose --env-file .env.production up -d --build
+#   docker compose --env-file .env.production run --rm migrate
+#   docker compose --env-file .env.production run --rm migrate npm run create-super-admin -- vous@domaine.com Prénom Nom
+# ---------------------------------------------------------------
+name: trainingos
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?}
+      POSTGRES_DB: postgres
+      OWNER_PASSWORD: ${DB_OWNER_PASSWORD:?}
+      APP_PASSWORD: ${DB_APP_PASSWORD:?}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      retries: 10
+    # Aucun port exposé : la base n'est accessible que depuis le réseau interne
+
+  migrate:
+    build: { context: ., target: tools }
+    profiles: ["tools"]
+    environment:
+      DATABASE_MIGRATION_URL: postgres://trainingos_owner:${DB_OWNER_PASSWORD}@db:5432/trainingos
+      DATABASE_URL: postgres://trainingos_app:${DB_APP_PASSWORD}@db:5432/trainingos
+      APP_ENV: ${APP_ENV:-production}
+      APP_SECRET: ${APP_SECRET:?}
+    depends_on:
+      db: { condition: service_healthy }
+
+  app:
+    build: { context: ., target: runner }
+    image: ${APP_IMAGE:-trainingos:latest}
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgres://trainingos_app:${DB_APP_PASSWORD}@db:5432/trainingos
+      DATABASE_SSL: "false" # trafic interne au réseau Docker ; TLS assuré par Caddy côté public
+      STORAGE_LOCAL_DIR: /app/storage
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      db: { condition: service_healthy }
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443", "443:443/udp"]
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?}
+      VERIFY_DOMAIN: ${VERIFY_DOMAIN:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [app]
+
+  # Tâches quotidiennes (relances, alertes, certificats auto) à 06:45 heure d'Abidjan (UTC)
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    environment:
+      CRON_SECRET: ${CRON_SECRET:?}
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null &&
+             echo '45 6 * * * curl -fsS -m 300 -H \"Authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron/daily > /proc/1/fd/1 2>&1' | crontab - &&
+             crond -f -l 8"
+    depends_on: [app]
+
+  # Sauvegardes chiffrables : dump quotidien + rétention (voir docs/OPERATIONS.md)
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      PGPASSWORD: ${DB_OWNER_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_ENCRYPTION_KEY: ${BACKUP_ENCRYPTION_KEY:-}
+    volumes:
+      - ./backups:/backups
+      - ./deploy/backup.sh:/usr/local/bin/backup.sh:ro
+      - ./deploy/restore.sh:/usr/local/bin/restore.sh:ro
+      - storage:/storage:ro
+    entrypoint: >
+      sh -c "echo '15 2 * * * sh /usr/local/bin/backup.sh > /proc/1/fd/1 2>&1' | crontab - && crond -f -l 8"
+    depends_on:
+      db: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  storage:
+  caddy_data:
+  caddy_config:

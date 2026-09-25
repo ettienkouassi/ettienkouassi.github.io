@@ -1,0 +1,24 @@
+# Reverse proxy HTTPS automatique (certificats Let's Encrypt).
+# Remplacer les domaines par les vôtres (DNS A/AAAA pointant vers le serveur).
+{
+	email {$ACME_EMAIL}
+}
+
+{$APP_DOMAIN}, {$VERIFY_DOMAIN} {
+	encode zstd gzip
+	# Taille max des téléversements (supports de cours : 50 Mo)
+	request_body {
+		max_size 60MB
+	}
+	header {
+		-Server
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+	}
+	reverse_proxy app:3000 {
+		header_up X-Real-IP {remote_host}
+	}
+	log {
+		output stdout
+		format json
+	}
+}
